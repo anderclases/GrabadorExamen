@@ -4,6 +4,7 @@ import time
 import getpass
 import threading
 import subprocess
+import ctypes
 from datetime import datetime
 import tkinter as tk
 from tkinter import messagebox
@@ -11,18 +12,17 @@ import cv2
 import numpy as np
 from PIL import ImageGrab
 
-# icono descargado en https://loading.io/icon/fllmzd
-
-# CONFIGURACIÓN DE COMPRESIÓN
+# CONFIGURACIÓN
 INTERVALO_SEGUNDOS = 2.0  # Captura 1 fotograma cada 2 segundos (0.5 FPS)
 ALTO_RESOLUCION_MP4 = 540 # Resolución vertical objetivo (540p)
 ESCALA_DE_GRISES = True   # Convierte a blanco y negro para reducir espacio
+ANCHO_VENTANA = 140
+ALTO_VENTANA = 45
 
 def obtener_carpeta_videos_sistema():
     """Obtiene la ruta oficial de la carpeta 'Vídeos' en Windows."""
     if sys.platform == "win32":
         try:
-            import ctypes
             from ctypes import wintypes
             buf = ctypes.create_unicode_buffer(wintypes.MAX_PATH)
             ctypes.windll.shell32.SHGetFolderPathW(None, 14, None, 0, buf)
@@ -35,14 +35,13 @@ def obtener_carpeta_videos_sistema():
 class ExamenRecorderApp:
     def __init__(self, root):
         self.root = root
+        self.arrastrando = False
 
         # Configuración de la ventana flotante sin bordes
         self.root.overrideredirect(True)
-        self.root.geometry("140x45")
+        self.root.geometry(f"{ANCHO_VENTANA}x{ALTO_VENTANA}")
         self.root.configure(bg="#1e1e1e")
-        self.root.attributes("-topmost", True)
-        self.root.lift()
-
+        
         # Etiqueta "● Rec"
         self.label_rec = tk.Label(
             self.root,
@@ -75,6 +74,7 @@ class ExamenRecorderApp:
         for widget in (self.root, self.label_rec):
             widget.bind("<Button-1>", self.iniciar_arrastre)
             widget.bind("<B1-Motion>", self.arrastrar)
+            widget.bind("<ButtonRelease-1>", self.detener_arrastre)
 
         # Variables de control y rutas
         self.ruta_avi = None
@@ -82,15 +82,52 @@ class ExamenRecorderApp:
         self.hilo_grabacion = threading.Thread(target=self.grabar_pantalla, daemon=True)
         self.hilo_grabacion.start()
 
+        # Configuración Topmost inicial y mantenimiento
+        self.forzar_topmost()
+        self._bucle_mantenimiento_topmost()
+
+    def forzar_topmost(self):
+        """Asegura que la ventana permanezca por encima de la barra de tareas de Windows."""
+        self.root.attributes("-topmost", True)
+        self.root.lift()
+        if sys.platform == "win32":
+            try:
+                hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+                if not hwnd:
+                    hwnd = self.root.winfo_id()
+                # HWND_TOPMOST = -1, SWP_NOMOVE = 0x0002, SWP_NOSIZE = 0x0001, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040
+                ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 | 0x0040)
+            except Exception:
+                pass
+
+    def _bucle_mantenimiento_topmost(self):
+        """Reaplica periódicamente la propiedad topmost solo cuando no se está arrastrando."""
+        if self.grabando:
+            if not self.arrastrando:
+                self.forzar_topmost()
+            self.root.after(500, self._bucle_mantenimiento_topmost)
+
     def iniciar_arrastre(self, event):
+        self.arrastrando = True
         self.offset_x = event.x_root - self.root.winfo_x()
         self.offset_y = event.y_root - self.root.winfo_y()
+
+    def detener_arrastre(self, event):
+        self.arrastrando = False
+        self.forzar_topmost()
 
     def arrastrar(self, event):
         x = event.x_root - self.offset_x
         y = event.y_root - self.offset_y
+
+        ancho_pantalla = self.root.winfo_screenwidth()
+        alto_pantalla = self.root.winfo_screenheight()
+
+        # Restringir estrictamente dentro de los límites de la pantalla
+        x = max(0, min(x, ancho_pantalla - ANCHO_VENTANA))
+        y = max(0, min(y, alto_pantalla - ALTO_VENTANA))
+
         self.root.geometry(f"+{x}+{y}")
-        self.root.lift()
 
     def grabar_pantalla(self):
         """Graba fotogramas continuos en formato AVI / MJPEG resistente a fallos."""
@@ -120,7 +157,6 @@ class ExamenRecorderApp:
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
                 if ESCALA_DE_GRISES:
-                    # Convertir a grises y reconvertir a 3 canales para compatibilidad con VideoWriter
                     gris = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                     frame = cv2.cvtColor(gris, cv2.COLOR_GRAY2BGR)
 
@@ -134,10 +170,7 @@ class ExamenRecorderApp:
             out.release()
 
     def convertir_avi_a_mp4_ultraligero(self, ruta_avi, ruta_mp4):
-        """
-        Convierte a MP4 aplicando escala 540p y compresión optimizada.
-        Si encuentra 'ffmpeg.exe' local o en el sistema, aplica H.264 de alta compresión.
-        """
+        """Convierte a MP4 aplicando escala 540p y compresión optimizada."""
         cap = cv2.VideoCapture(ruta_avi)
         if not cap.isOpened():
             return
@@ -146,21 +179,19 @@ class ExamenRecorderApp:
         ancho_orig = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         alto_orig = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        # Calcular resolución objetivo (ej. 540p)
         alto_nuevo = ALTO_RESOLUCION_MP4
         if alto_orig > 0:
             ancho_nuevo = (int(ancho_orig * (float(alto_nuevo) / alto_orig)) // 2) * 2
         else:
             ancho_nuevo = 960
 
-        # Verificar si existe ffmpeg ejecutable local o global
         exe_ffmpeg = "ffmpeg.exe" if os.path.exists("ffmpeg.exe") else "ffmpeg"
 
         comando_ffmpeg = [
             exe_ffmpeg, '-y', '-i', ruta_avi,
             '-vf', f'scale={ancho_nuevo}:{alto_nuevo}',
             '-vcodec', 'libx264',
-            '-crf', '34',              # Mayor número = menor tamaño (34 es excelente para texto)
+            '-crf', '34',
             '-preset', 'faster',
             '-pix_fmt', 'yuv420p',
             ruta_mp4
@@ -182,9 +213,8 @@ class ExamenRecorderApp:
             cap.release()
             return
         except Exception:
-            pass  # Si FFmpeg no está presente, pasa a la alternativa nativa con OpenCV
+            pass
 
-        # Plan de respaldo con OpenCV nativo (mp4v) + 540p + Grises
         codec_mp4 = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(ruta_mp4, codec_mp4, fps, (ancho_nuevo, alto_nuevo))
 
