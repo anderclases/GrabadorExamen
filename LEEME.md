@@ -1,1 +1,0 @@
-python -m PyInstaller --onefile --noconsole --name "GrabadorExamen" main.py
