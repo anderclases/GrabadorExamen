@@ -1,33 +1,33 @@
-# 🎥 ExamenRecorder App
+# 🎥 GrabadorExamen
 
-**ExamenRecorder App** es una aplicación liviana de escritorio desarrollada en **Python** con **Tkinter** y **OpenCV**, diseñada para supervisar y grabar la pantalla durante la realización de exámenes en línea o evaluaciones académicas.
+Veyond nos permite vigilar durante el examen, pero presenta problemas a la hora de revisar un caso concreto, este programa nos sirve para que durante cada examen haya un vídeo único de cada equipo y facilitar la revisión.
 
-La herramienta combina una interfaz minimalista flotante con un sistema de grabación **resistente a fallos (fail-safe)** y una conversión post-examen optimizada para generar archivos de vídeo con un peso extraordinariamente bajo.
+El ejecutable es portable por lo que es fácil de activar. Las dos grabaciones se guardarán en la carpeta vídeos del sistema operativo.
+
+[DESCARGAR aqui](https://github.com/anderclases/GrabadorExamen/releases/tag/1).
+
+## Protocolo de uso recomendado.
+
+* Aunque el resultado final sea muy ligero (un vídeo de 2 horas ronda los 70 megas), sigue siendo un problema para subir al Mooodle, por eso, estamos pidiendo que lo suban a una carpeta compartida de Google Drive.
+* Además ambos vídeos deben de mantenerse en el equipo del alumno y no ser aliminados a no ser que haya un permiso explicito del profesorado.
+* Para no saturar el Drive hay que subir el archivo comprimido, tiene formato `.mp4` y un peso notablemente más bajo.
 
 ## 🚀 Características Principales
 
-* **📌 Interfaz Flotante Minimalista:**
-  * Ventana flotante sin bordes, siempre visible (`topmost`), que se puede arrastrar libremente por cualquier zona de la pantalla.
-  * Indicador visual de grabación activa (`● Rec`) y botón discreto para finalizar el examen.
+* **📌 Interfaz Flotante:**
+  * Ventana que se puede arrastrar libremente por cualquier zona de la pantalla.
+  * Indicador visual de grabación activa (`● Rec`) y botón para finalizar el examen.
 
-* **🛡️ Grabación Resiliente a Fallos (Buffer AVI / MJPEG):**
-  * Captura continua mediante `Pillow` y `OpenCV` guardando cada fotograma directamente en disco.
-  * El contenedor `.avi` con códec Motion JPEG (`MJPG`) garantiza que el archivo sea **reproducible incluso si la aplicación se interrumpe abruptamente** (apagones, cierres forzados, etc.).
+* **🛡️ Grabación Resistente a Fallos:**
+  * Captura streaming en directo de la grabación y almacena el resultado en un archivo `.avi`. Garantiza que el archivo sea **reproducible incluso si la aplicación se interrumpe abruptamente** (apagones, cierres forzados, etc.).
 
 * **📉 Conversión y Compresión Ultra Ligera a MP4:**
   * Al finalizar la sesión, el sistema procesa el vídeo en un hilo secundario y genera una copia comprimida en formato `.mp4`.
-  * **Optimización de tamaño:**
+  * **Caracteristicas de la Optimización de tamaño:**
     * Ajuste de resolución objetivo (720p / 540p).
     * Opción de captura en **escala de grises** (ideal para interfaces de texto/exámenes).
     * Reducción del ratio de fotogramas por segundo (FPS) adaptado a contenido estático.
-  * Mantiene intacto el archivo `.avi` original para mayor seguridad.
-
-* **⏳ Ventana Emergente de Estado:**
-  * Muestra la pantalla flotante *"Preparando vídeo..."* al finalizar el examen para informar al usuario de que la conversión está en curso.
-  * La ventana y el proceso se cierran de forma completamente automática al terminar.
-
-* **🔇 Sin Pista de Audio:**
-  * Centrado exclusivamente en la captura de vídeo para optimizar los recursos del sistema y reducir el espacio de almacenamiento al mínimo.
+  * Mantiene intacto el archivo `.avi` original para mamtenerlo cómo backup.
 
 ## 🛠️ Requisitos del Sistema
 
@@ -36,7 +36,6 @@ La herramienta combina una interfaz minimalista flotante con un sistema de graba
   ```bash
   pip install opencv-python numpy pillow pyinstaller
   ```
-* *(Opcional)* **FFmpeg:** Si `ffmpeg` está disponible en el sistema o en la carpeta raíz del script, la aplicación aplicará compresión avanzada H.264 (`libx264`) para lograr tamaños aún más reducidos.
 
 ## 📦 Compilación a Ejecutable (.exe)
 
